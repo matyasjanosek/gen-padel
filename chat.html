@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gen Padel – AI Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0d08; color: #e8eee0; font-family: 'DM Sans', sans-serif; height: 100vh; display: flex; flex-direction: column; }
+    nav { display: flex; align-items: center; gap: 1.5rem; padding: 1.2rem 2rem; border-bottom: 1px solid #1e2419; }
+    .logo { font-size: 0.85rem; letter-spacing: 0.25em; text-transform: uppercase; color: #b5f23d; border: 1px solid #b5f23d; padding: 0.3rem 0.7rem; }
+    .nav-title { font-size: 0.8rem; letter-spacing: 0.15em; text-transform: uppercase; color: #6b7a5e; }
+    .nav-back { margin-left: auto; color: #6b7a5e; text-decoration: none; font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; }
+    .nav-back:hover { color: #b5f23d; }
+    .chat-wrap { flex: 1; display: flex; flex-direction: column; max-width: 760px; width: 100%; margin: 0 auto; padding: 2rem 1.5rem 1.5rem; gap: 1rem; overflow: hidden; }
+    .chat-header { text-align: center; }
+    .chat-header h1 { font-family: 'Bebas Neue', sans-serif; font-size: 2.5rem; letter-spacing: 0.06em; }
+    .chat-header h1 span { color: #b5f23d; }
+    .chat-header p { margin-top: 0.4rem; font-size: 0.78rem; letter-spacing: 0.2em; text-transform: uppercase; color: #6b7a5e; }
+    #messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.8rem; padding-right: 0.3rem; }
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-thumb { background: #1e2419; border-radius: 2px; }
+    .msg { display: flex; flex-direction: column; gap: 0.2rem; max-width: 80%; }
+    .msg.user { align-self: flex-end; align-items: flex-end; }
+    .msg.bot { align-self: flex-start; align-items: flex-start; }
+    .msg-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: #6b7a5e; }
+    .msg-bubble { padding: 0.75rem 1rem; font-size: 0.9rem; line-height: 1.6; font-weight: 300; }
+    .msg.user .msg-bubble { background: #b5f23d; color: #0a0d08; font-weight: 400; }
+    .msg.bot .msg-bubble { background: #1e2419; color: #e8eee0; border-left: 2px solid #b5f23d; }
+    .typing .msg-bubble { display: flex; gap: 0.3rem; align-items: center; }
+    .dot { width: 6px; height: 6px; background: #b5f23d; border-radius: 50%; animation: bounce 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-6px); opacity: 1; } }
+    .suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .suggestion { background: transparent; border: 1px solid #2a3220; color: #6b7a5e; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; padding: 0.4rem 0.8rem; cursor: pointer; transition: all 0.2s; }
+    .suggestion:hover { border-color: #b5f23d; color: #b5f23d; }
+    .input-wrap { display: flex; gap: 0.6rem; padding-top: 0.5rem; border-top: 1px solid #1e2419; }
+    #input { flex: 1; background: #1e2419; border: 1px solid #2a3220; color: #e8eee0; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; padding: 0.75rem 1rem; outline: none; transition: border-color 0.2s; }
+    #input::placeholder { color: #6b7a5e; }
+    #input:focus { border-color: #b5f23d; }
+    #send { background: #b5f23d; color: #0a0d08; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.75rem 1.4rem; border: none; cursor: pointer; clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%); }
+    #send:disabled { opacity: 0.4; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="logo">GP</div>
+    <span class="nav-title">AI Assistant</span>
+    <a href="index.html" class="nav-back">← Back</a>
+  </nav>
+
+  <div class="chat-wrap">
+    <div class="chat-header">
+      <h1>GEN <span>PADEL</span></h1>
+      <p>AI Assistant · Rožnov pod Radhoštěm</p>
+    </div>
+
+    <div id="messages">
+      <div class="msg bot">
+        <span class="msg-label">Gen Padel AI</span>
+        <div class="msg-bubble">Hi! I'm the Gen Padel AI assistant. Ask me anything about our club, courts, pricing or reservations.</div>
+      </div>
+    </div>
+
+    <div class="suggestions">
+      <button class="suggestion" onclick="ask('When do you open?')">When do you open?</button>
+      <button class="suggestion" onclick="ask('What are the prices?')">What are the prices?</button>
+      <button class="suggestion" onclick="ask('How do I book a court?')">How to book?</button>
+      <button class="suggestion" onclick="ask('What is padel?')">What is padel?</button>
+    </div>
+
+    <div class="input-wrap">
+      <input id="input" type="text" placeholder="Ask a question..." autocomplete="off" />
+      <button id="send" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const SYSTEM_PROMPT = `You are an AI assistant for Gen Padel Rožnov - a modern padel club in Rožnov pod Radhoštěm, Czech Republic.
+
+Club info:
+- Name: Gen Padel Rožnov
+- Location: Rožnov pod Radhoštěm, Czech Republic (Beskydy mountains)
+- Opening: 2026
+- Courts: 2 outdoor padel courts with a pneumatic hall for year-round play
+- Access: 24/7 automated entry via PIN or QR code
+- Booking: via mobile app
+- Contact: info@genpadel.cz
+
+Answer in English, keep it friendly and concise. If you don't know something, say the club is still opening and details will be confirmed soon.`;
+
+    const history = [];
+    const input = document.getElementById('input');
+    const send = document.getElementById('send');
+    const messages = document.getElementById('messages');
+
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+
+    function ask(text) { input.value = text; sendMessage(); }
+
+    function addMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = `msg ${role}`;
+      div.innerHTML = `<span class="msg-label">${role === 'user' ? 'You' : 'Gen Padel AI'}</span><div class="msg-bubble">${text}</div>`;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+      return div;
+    }
+
+    function addTyping() {
+      const div = document.createElement('div');
+      div.className = 'msg bot typing';
+      div.innerHTML = `<span class="msg-label">Gen Padel AI</span><div class="msg-bubble"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+      return div;
+    }
+
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      send.disabled = true;
+      addMessage('user', text);
+      history.push({ role: 'user', parts: [{ text }] });
+      const typing = addTyping();
+      try {
+        const res = await fetch('/.netlify/functions/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: history
+          })
+        });
+        const data = await res.json();
+        const reply = data.candidates[0].content.parts[0].text;
+        history.push({ role: 'model', parts: [{ text: reply }] });
+        typing.remove();
+        addMessage('bot', reply);
+      } catch(err) {
+        typing.remove();
+        addMessage('bot', 'Sorry, something went wrong. Please try again.');
+      }
+      send.disabled = false;
+      input.focus();
+    }
+  </script>
+
+</body>
+</html>
