@@ -122,6 +122,30 @@
     }
 
     .ar-btn:hover { box-shadow: 0 6px 20px rgba(181,242,61,0.4); }
+
+    .ai-btn {
+      position: fixed;
+      bottom: 2rem;
+      left: 2rem;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: transparent;
+      border: 1px solid #b5f23d;
+      color: #b5f23d;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.65rem 1.4rem;
+      text-decoration: none;
+      clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .ai-btn:hover { background: #b5f23d; color: #0a0d08; }
   </style>
 </head>
 <body>
@@ -139,6 +163,8 @@
     <h1>GEN<br><span>PADEL</span><br>ROZNOV</h1>
     <p class="sub">Roznov pod Radhostem · 2027</p>
   </div>
+
+  <a href="chat.html" class="ai-btn">💬 AI Assistant</a>
 
   <div class="ar-wrap">
     <model-viewer id="mv" src="padel_court.glb" ar ar-modes="webxr scene-viewer quick-look"></model-viewer>
