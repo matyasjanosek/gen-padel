@@ -15,6 +15,7 @@ export async function handler(event) {
     });
   
     const data = await res.json();
+    console.log('Gemini response:', JSON.stringify(data));
   
     return {
       statusCode: 200,
