@@ -131,200 +131,45 @@
 
   <script type="module" src="main.js"></script>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script>
-async function generatePlan() {
-  const level = document.getElementById('level').value;
-  const sessions = document.getElementById('sessions').value;
-  const goal = document.getElementById('goal').value;
-  const injuries = document.getElementById('injuries').value || 'none';
-  const btn = document.getElementById('gen-btn');
-  const output = document.getElementById('plan-output');
+  <script>
+  async function generatePlan() {
+    const level = document.getElementById('level').value;
+    const sessions = document.getElementById('sessions').value;
+    const goal = document.getElementById('goal').value;
+    const injuries = document.getElementById('injuries').value || 'none';
+    const btn = document.getElementById('gen-btn');
+    const output = document.getElementById('plan-output');
 
-  btn.disabled = true;
-  btn.textContent = 'Generating...';
-  output.classList.remove('visible');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    output.classList.remove('visible');
 
-  const prompt = `Create a 4-week padel training plan for a ${level} player, ${sessions} sessions per week, goal: ${goal}, injuries: ${injuries}.
+    const prompt = `Write a short padel training recommendation for a ${level} player who trains ${sessions} times per week. Goal: ${goal}. Injuries: ${injuries}. Give practical advice in a few sentences.`;
 
-Format it clearly with:
-- A short overview paragraph
-- 3 key tips
-- Week 1, Week 2, Week 3, Week 4 sections
-- Each week has training days with day name, focus area, and 2-3 exercises
+    try {
+      const res = await fetch('/.netlify/functions/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: 'You are a professional padel coach. Give short practical advice.' }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }]
+        })
+      });
 
-Keep it concise and practical.`;
+      const data = await res.json();
+      const text = data.candidates[0].content.parts[0].text;
+      output.textContent = text;
+      output.classList.add('visible');
 
-  try {
-    const res = await fetch('/.netlify/functions/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: 'You are a professional padel coach. Write clear, practical training plans in plain text.' }] },
-        contents: [{ role: 'user', parts: [{ text: prompt }] }]
-      })
-    });
+    } catch(err) {
+      output.textContent = 'Sorry, something went wrong. Please try again.';
+      output.classList.add('visible');
+    }
 
-    const data = await res.json();
-    const text = data.candidates[0].content.parts[0].text;
-
-    output.textContent = 'Plan generated! Downloading PDF...';
-    output.classList.add('visible');
-
-    generatePDF(text, level, sessions, goal, injuries);
-
-  } catch(err) {
-    output.textContent = 'Sorry, something went wrong. Please try again.';
-    output.classList.add('visible');
+    btn.disabled = false;
+    btn.textContent = 'Generate my plan';
   }
-
-  btn.disabled = false;
-  btn.textContent = 'Generate my plan';
-}
-
-function generatePDF(text, level, sessions, goal, injuries) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const green = [181, 242, 61];
-  const dark = [10, 13, 8];
-  const gray = [100, 120, 90];
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  let y = 0;
-
-  function addFooter() {
-    const total = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= total; i++) {
-      doc.setPage(i);
-      doc.setDrawColor(...green);
-      doc.setLineWidth(0.3);
-      doc.line(15, pageH - 12, pageW - 15, pageH - 12);
-      doc.setTextColor(...gray);
-      doc.setFontSize(7);
-      doc.text('Gen Padel Roznov · genpadel.cz · info@genpadel.cz', 15, pageH - 6);
-      doc.text(`${i} / ${total}`, pageW - 15, pageH - 6, { align: 'right' });
-    }
-  }
-
-  // HEADER
-  doc.setFillColor(...dark);
-  doc.rect(0, 0, pageW, 40, 'F');
-  doc.setTextColor(...green);
-  doc.setFontSize(22);
-  doc.setFont('helvetica', 'bold');
-  doc.text('GEN PADEL', 15, 20);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(200, 210, 190);
-  doc.text('PERSONALISED TRAINING PLAN', 15, 30);
-  doc.setTextColor(...gray);
-  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, pageW - 15, 30, { align: 'right' });
-
-  y = 52;
-
-  // PROFILE
-  doc.setFillColor(240, 245, 235);
-  doc.roundedRect(15, y, pageW - 30, 28, 2, 2, 'F');
-  const profile = [
-    ['LEVEL', level],
-    ['SESSIONS/WEEK', sessions],
-    ['GOAL', goal],
-    ['LIMITATIONS', injuries]
-  ];
-  const colW = (pageW - 30) / 4;
-  profile.forEach(([label, val], i) => {
-    const x = 15 + i * colW + colW / 2;
-    doc.setTextColor(...gray);
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'bold');
-    doc.text(label, x, y + 9, { align: 'center' });
-    doc.setTextColor(...dark);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text(String(val), x, y + 18, { align: 'center' });
-  });
-
-  y += 38;
-
-  // PLAN TEXT
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(40, 50, 30);
-
-  const lines = text.split('\n');
-  lines.forEach(line => {
-    if (y > pageH - 20) {
-      doc.addPage();
-      y = 20;
-      doc.setDrawColor(...green);
-      doc.setLineWidth(0.5);
-      doc.line(15, 15, pageW - 15, 15);
-    }
-
-    const trimmed = line.trim();
-    if (!trimmed) { y += 3; return; }
-
-    // Week headers
-    if (trimmed.match(/^week\s*\d/i) || trimmed.match(/^##/i)) {
-      y += 4;
-      doc.setFillColor(...dark);
-      doc.rect(15, y - 5, pageW - 30, 10, 'F');
-      doc.setTextColor(...green);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.text(trimmed.replace(/^#+\s*/, '').toUpperCase(), 20, y + 1);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(40, 50, 30);
-      y += 10;
-      return;
-    }
-
-    // Day headers
-    if (trimmed.match(/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i) || trimmed.match(/^\*\*(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i)) {
-      y += 2;
-      doc.setFillColor(240, 248, 230);
-      doc.setDrawColor(...green);
-      doc.setLineWidth(0.3);
-      const wrapped = doc.splitTextToSize(trimmed.replace(/\*\*/g, ''), pageW - 35);
-      doc.roundedRect(15, y - 4, pageW - 30, wrapped.length * 5 + 4, 1, 1, 'FD');
-      doc.setFillColor(...green);
-      doc.rect(15, y - 4, 3, wrapped.length * 5 + 4, 'F');
-      doc.setTextColor(...dark);
-      doc.setFont('helvetica', 'bold');
-      doc.text(wrapped, 22, y + 1);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(40, 50, 30);
-      y += wrapped.length * 5 + 6;
-      return;
-    }
-
-    // Bullet points
-    if (trimmed.startsWith('-') || trimmed.startsWith('•') || trimmed.startsWith('*')) {
-      const content = trimmed.replace(/^[-•*]\s*/, '').replace(/\*\*/g, '');
-      const wrapped = doc.splitTextToSize(content, pageW - 35);
-      doc.setTextColor(...green);
-      doc.text('•', 18, y);
-      doc.setTextColor(40, 50, 30);
-      doc.text(wrapped, 24, y);
-      y += wrapped.length * 5 + 1;
-      return;
-    }
-
-    // Regular text
-    const clean = trimmed.replace(/\*\*/g, '');
-    const wrapped = doc.splitTextToSize(clean, pageW - 30);
-    doc.setTextColor(40, 50, 30);
-    doc.text(wrapped, 15, y);
-    y += wrapped.length * 5 + 2;
-  });
-
-  addFooter();
-  doc.save(`GenPadel-TrainingPlan-${new Date().toISOString().slice(0,10)}.pdf`);
-}
-</script>
+  </script>
 
 </body>
 </html>
