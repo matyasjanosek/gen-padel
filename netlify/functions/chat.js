@@ -16,11 +16,14 @@ export async function handler(event) {
     }))
   ];
 
-  const res = await fetch(`http://${process.env.OLLAMA_IP}:11434/v1/chat/completions`, {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+    },
     body: JSON.stringify({
-      model: 'gemma3:4b',
+      model: 'llama-3.3-70b-versatile',
       messages
     })
   });
