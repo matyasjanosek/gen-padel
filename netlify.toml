@@ -2,4 +2,4 @@
   directory = "netlify/functions"
 
 [functions.chat]
-  timeout = 90
+  timeout = 60
