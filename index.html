@@ -132,44 +132,51 @@
   <script type="module" src="main.js"></script>
 
   <script>
-  async function generatePlan() {
-    const level = document.getElementById('level').value;
-    const sessions = document.getElementById('sessions').value;
-    const goal = document.getElementById('goal').value;
-    const injuries = document.getElementById('injuries').value || 'none';
-    const btn = document.getElementById('gen-btn');
-    const output = document.getElementById('plan-output');
+async function generatePlan() {
+  const level = document.getElementById('level').value;
+  const sessions = document.getElementById('sessions').value;
+  const goal = document.getElementById('goal').value;
+  const injuries = document.getElementById('injuries').value || 'none';
+  const btn = document.getElementById('gen-btn');
+  const output = document.getElementById('plan-output');
 
-    btn.disabled = true;
-    btn.textContent = 'Generating...';
-    output.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  output.classList.remove('visible');
 
-    const prompt = `Write a short padel training recommendation for a ${level} player who trains ${sessions} times per week. Goal: ${goal}. Injuries: ${injuries}. Give practical advice in a few sentences.`;
+  const prompt = `Create a 4-week padel training plan for a ${level} player, ${sessions} sessions per week, goal: ${goal}, injuries: ${injuries}.
 
-    try {
-      const res = await fetch('/.netlify/functions/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: 'You are a professional padel coach. Give short practical advice.' }] },
-          contents: [{ role: 'user', parts: [{ text: prompt }] }]
-        })
-      });
+Format it clearly with:
+- A short overview paragraph
+- 3 key tips
+- Week 1, Week 2, Week 3, Week 4 sections
+- Each week has training days with day name, focus area, and 2-3 exercises
 
-      const data = await res.json();
-      const text = data.candidates[0].content.parts[0].text;
-      output.textContent = text;
-      output.classList.add('visible');
+Keep it concise and practical.`;
 
-    } catch(err) {
-      output.textContent = 'Sorry, something went wrong. Please try again.';
-      output.classList.add('visible');
-    }
+  try {
+    const res = await fetch('/.netlify/functions/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: 'You are a professional padel coach. Write clear, practical training plans in plain text.' }] },
+        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      })
+    });
 
-    btn.disabled = false;
-    btn.textContent = 'Generate my plan';
+    const data = await res.json();
+    const text = data.candidates[0].content.parts[0].text;
+    output.textContent = text;
+    output.classList.add('visible');
+
+  } catch(err) {
+    output.textContent = 'Sorry, something went wrong. Please try again.';
+    output.classList.add('visible');
   }
-  </script>
 
+  btn.disabled = false;
+  btn.textContent = 'Generate my plan';
+}
+</script>
 </body>
 </html>
