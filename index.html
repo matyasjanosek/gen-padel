@@ -132,6 +132,22 @@
   <script type="module" src="main.js"></script>
 
   <script>
+async function wakeUp() {
+  try {
+    await fetch('/.netlify/functions/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: 'You are a padel coach.' }] },
+        contents: [{ role: 'user', parts: [{ text: 'hi' }] }]
+      })
+    });
+  } catch(e) {}
+}
+
+// Probudí model hned po načtení stránky
+wakeUp();
+
 async function generatePlan() {
   const level = document.getElementById('level').value;
   const sessions = document.getElementById('sessions').value;
