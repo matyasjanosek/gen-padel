@@ -16,28 +16,16 @@ export async function handler(event) {
     }))
   ];
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const res = await fetch(`http://${process.env.OLLAMA_IP}:11434/v1/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model: 'gemma3:1b',
       messages
     })
   });
 
   const data = await res.json();
-  console.log('Groq response:', JSON.stringify(data));
-
-  if (!data.choices || !data.choices[0]) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Groq error', detail: data })
-    };
-  }
-
   const reply = data.choices[0].message.content;
 
   return {
