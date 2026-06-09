@@ -174,7 +174,7 @@ async function generatePlan() {
 
     const data = await res.json();
     const text = data.candidates[0].content.parts[0].text;
-    output.textContent = text;
+    output.textContent = text.replace(/\*\*/g, '').replace(/\*/g, '');
     output.classList.add('visible');
 
   } catch(err) {
