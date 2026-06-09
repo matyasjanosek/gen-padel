@@ -160,15 +160,7 @@ async function generatePlan() {
   btn.textContent = 'Generating...';
   output.classList.remove('visible');
 
-  const prompt = `Create a 4-week padel training plan for a ${level} player, ${sessions} sessions per week, goal: ${goal}, injuries: ${injuries}.
-
-Format it clearly with:
-- A short overview paragraph
-- 3 key tips
-- Week 1, Week 2, Week 3, Week 4 sections
-- Each week has training days with day name, focus area, and 2-3 exercises
-
-Keep it concise and practical.`;
+  const prompt = `Short padel training advice for ${level} player, ${sessions}x per week, goal: ${goal}, injuries: ${injuries}. Max 150 words.`;
 
   try {
     const res = await fetch('/.netlify/functions/chat', {
