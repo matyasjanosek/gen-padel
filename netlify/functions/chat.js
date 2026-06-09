@@ -20,7 +20,7 @@ export async function handler(event) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'gemma3:1b',
+      model: 'gemma3:4b',
       messages
     })
   });
