@@ -132,6 +132,7 @@
   <script type="module" src="main.js"></script>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 async function generatePlan() {
   const level = document.getElementById('level').value;
@@ -147,9 +148,9 @@ async function generatePlan() {
 
   const prompt = `Generate a personalised padel training plan for a ${level} player who trains ${sessions} times per week. Goal: ${goal}. Injuries/limitations: ${injuries}.
 
-Return ONLY a JSON object in this exact format, no other text:
+Return ONLY a JSON object in this exact format, no other text, no markdown:
 {
-  "summary": "2-3 sentence overview of the plan",
+  "summary": "2-3 sentence overview",
   "tips": ["tip1", "tip2", "tip3"],
   "weeks": [
     {
@@ -161,14 +162,14 @@ Return ONLY a JSON object in this exact format, no other text:
     }
   ]
 }
-Generate 4 weeks. Only include training days (skip rest days). Adapt everything to the player's level, goal and injuries.`;
+Generate 4 weeks. Only include training days. Every day object must have exactly these keys: day, focus, exercises. No extra keys.`;
 
   try {
     const res = await fetch('/.netlify/functions/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: 'You are a professional padel coach. Return only valid JSON, no markdown, no explanation.' }] },
+        system_instruction: { parts: [{ text: 'You are a professional padel coach. Return only valid JSON. No markdown, no backticks, no explanation. Only the JSON object.' }] },
         contents: [{ role: 'user', parts: [{ text: prompt }] }]
       })
     });
@@ -176,7 +177,18 @@ Generate 4 weeks. Only include training days (skip rest days). Adapt everything 
     const data = await res.json();
     let raw = data.candidates[0].content.parts[0].text;
     raw = raw.replace(/```json|```/g, '').trim();
-    const plan = JSON.parse(raw);
+    raw = raw.replace(/,\s*]/g, ']').replace(/,\s*}/g, '}');
+
+    let plan;
+    try {
+      plan = JSON.parse(raw);
+    } catch(e) {
+      output.textContent = raw;
+      output.classList.add('visible');
+      btn.disabled = false;
+      btn.textContent = 'Generate my plan';
+      return;
+    }
 
     output.textContent = 'Plan generated! Downloading PDF...';
     output.classList.add('visible');
@@ -205,7 +217,6 @@ function generatePDF(plan, level, sessions, goal, injuries) {
   function newPage() {
     doc.addPage();
     y = 20;
-    // subtle header line
     doc.setDrawColor(...green);
     doc.setLineWidth(0.5);
     doc.line(15, 15, pageW - 15, 15);
@@ -215,7 +226,7 @@ function generatePDF(plan, level, sessions, goal, injuries) {
     if (y + needed > pageH - 20) newPage();
   }
 
-  // ── HEADER ──
+  // HEADER
   doc.setFillColor(...dark);
   doc.rect(0, 0, pageW, 40, 'F');
   doc.setTextColor(...green);
@@ -231,10 +242,9 @@ function generatePDF(plan, level, sessions, goal, injuries) {
 
   y = 52;
 
-  // ── PROFILE ──
+  // PROFILE
   doc.setFillColor(240, 245, 235);
   doc.roundedRect(15, y, pageW - 30, 28, 2, 2, 'F');
-  doc.setTextColor(...dark);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   const profile = [
@@ -256,7 +266,7 @@ function generatePDF(plan, level, sessions, goal, injuries) {
 
   y += 38;
 
-  // ── SUMMARY ──
+  // SUMMARY
   doc.setTextColor(...dark);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
@@ -272,7 +282,7 @@ function generatePDF(plan, level, sessions, goal, injuries) {
   doc.text(summaryLines, 15, y);
   y += summaryLines.length * 5 + 10;
 
-  // ── TIPS ──
+  // TIPS
   checkY(30);
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
@@ -286,7 +296,7 @@ function generatePDF(plan, level, sessions, goal, injuries) {
   plan.tips.forEach(tip => {
     checkY(8);
     doc.setTextColor(...green);
-    doc.text('▸', 15, y);
+    doc.text('>', 15, y);
     doc.setTextColor(50, 60, 40);
     const tipLines = doc.splitTextToSize(tip, pageW - 35);
     doc.text(tipLines, 22, y);
@@ -295,13 +305,13 @@ function generatePDF(plan, level, sessions, goal, injuries) {
 
   y += 8;
 
-  // ── WEEKLY PLAN ──
+  // WEEKLY PLAN
   const today = new Date();
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   plan.weeks.forEach((week, wi) => {
     checkY(20);
 
-    // Week header
     doc.setFillColor(...dark);
     doc.rect(15, y - 5, pageW - 30, 12, 'F');
     doc.setTextColor(...green);
@@ -311,28 +321,21 @@ function generatePDF(plan, level, sessions, goal, injuries) {
     y += 14;
 
     week.days.forEach(d => {
-      checkY(25);
+      const exercises = d.exercises || [];
+      checkY(16 + exercises.length * 6);
 
-      // Calculate actual date
-      const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
       const targetDay = dayNames.indexOf(d.day);
       const date = new Date(today);
-      const diff = (targetDay - today.getDay() + 7) % 7 || 7;
+      const diff = ((targetDay - today.getDay() + 7) % 7) || 7;
       date.setDate(today.getDate() + diff + wi * 7);
       const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const cardH = 8 + exercises.length * 6;
 
-      // Day card
       doc.setFillColor(248, 252, 244);
-      doc.roundedRect(15, y, pageW - 30, 8 + d.exercises.length * 6, 1.5, 1.5, 'F');
-      doc.setDrawColor(...green);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(15, y, pageW - 30, 8 + d.exercises.length * 6, 1.5, 1.5, 'S');
-
-      // Left accent
+      doc.roundedRect(15, y, pageW - 30, cardH, 1.5, 1.5, 'F');
       doc.setFillColor(...green);
-      doc.rect(15, y, 3, 8 + d.exercises.length * 6, 'F');
+      doc.rect(15, y, 3, cardH, 'F');
 
-      // Day name + date
       doc.setTextColor(...dark);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
@@ -340,31 +343,32 @@ function generatePDF(plan, level, sessions, goal, injuries) {
       doc.setTextColor(...gray);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
-      doc.text(dateStr, 22 + doc.getTextWidth(d.day.toUpperCase() + '  '), y + 6);
+      doc.text(dateStr, 22 + doc.getTextWidth(d.day.toUpperCase()) + 3, y + 6);
 
-      // Focus badge
-      doc.setFillColor(...green);
-      doc.setTextColor(...dark);
-      doc.setFontSize(7);
-      const focusW = doc.getTextWidth(d.focus) + 6;
-      doc.roundedRect(pageW - 15 - focusW, y + 2, focusW, 6, 1, 1, 'F');
-      doc.text(d.focus, pageW - 15 - focusW / 2, y + 6.2, { align: 'center' });
+      const focus = d.focus || '';
+      if (focus) {
+        doc.setFillColor(...green);
+        doc.setTextColor(...dark);
+        doc.setFontSize(7);
+        const focusW = doc.getTextWidth(focus) + 6;
+        doc.roundedRect(pageW - 15 - focusW, y + 2, focusW, 6, 1, 1, 'F');
+        doc.text(focus, pageW - 15 - focusW / 2, y + 6.2, { align: 'center' });
+      }
 
-      // Exercises
-      d.exercises.forEach((ex, ei) => {
+      exercises.forEach((ex, ei) => {
         doc.setTextColor(60, 70, 50);
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         doc.text(`• ${ex}`, 24, y + 13 + ei * 6);
       });
 
-      y += 10 + d.exercises.length * 6 + 4;
+      y += cardH + 4;
     });
 
     y += 6;
   });
 
-  // ── FOOTER ──
+  // FOOTER
   const totalPages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -373,7 +377,7 @@ function generatePDF(plan, level, sessions, goal, injuries) {
     doc.line(15, pageH - 12, pageW - 15, pageH - 12);
     doc.setTextColor(...gray);
     doc.setFontSize(7);
-    doc.text('Gen Padel Rožnov · genpadel.cz · info@genpadel.cz', 15, pageH - 6);
+    doc.text('Gen Padel Roznov · genpadel.cz · info@genpadel.cz', 15, pageH - 6);
     doc.text(`${i} / ${totalPages}`, pageW - 15, pageH - 6, { align: 'right' });
   }
 
