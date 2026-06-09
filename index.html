@@ -131,42 +131,255 @@
 
   <script type="module" src="main.js"></script>
 
-  <script>
-    async function generatePlan() {
-      var level = document.getElementById('level').value;
-      var sessions = document.getElementById('sessions').value;
-      var goal = document.getElementById('goal').value;
-      var injuries = document.getElementById('injuries').value || 'none';
-      var btn = document.getElementById('gen-btn');
-      var output = document.getElementById('plan-output');
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+async function generatePlan() {
+  const level = document.getElementById('level').value;
+  const sessions = document.getElementById('sessions').value;
+  const goal = document.getElementById('goal').value;
+  const injuries = document.getElementById('injuries').value || 'none';
+  const btn = document.getElementById('gen-btn');
+  const output = document.getElementById('plan-output');
 
-      btn.disabled = true;
-      btn.textContent = 'Generating...';
-      output.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  output.classList.remove('visible');
 
-      var prompt = 'Generate a personalised padel training plan for a ' + level + ' player who can train ' + sessions + ' times per week. Their main goal is: ' + goal + '. Injuries: ' + injuries + '. Give a clear weekly plan with specific exercises. Format with days and sections.';
+  const prompt = `Generate a personalised padel training plan for a ${level} player who trains ${sessions} times per week. Goal: ${goal}. Injuries/limitations: ${injuries}.
 
-      try {
-        var res = await fetch('/.netlify/functions/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: 'You are a professional padel coach. Generate practical, specific training plans. Keep it concise and actionable.' }] },
-            contents: [{ role: 'user', parts: [{ text: prompt }] }]
-          })
-        });
-        var data = await res.json();
-        output.textContent = data.candidates[0].content.parts[0].text;
-        output.classList.add('visible');
-      } catch(err) {
-        output.textContent = 'Sorry, something went wrong. Please try again.';
-        output.classList.add('visible');
-      }
-
-      btn.disabled = false;
-      btn.textContent = 'Generate my plan';
+Return ONLY a JSON object in this exact format, no other text:
+{
+  "summary": "2-3 sentence overview of the plan",
+  "tips": ["tip1", "tip2", "tip3"],
+  "weeks": [
+    {
+      "week": 1,
+      "days": [
+        {"day": "Monday", "focus": "Footwork", "exercises": ["Exercise 1 - 3x10", "Exercise 2 - 2x15"]},
+        {"day": "Wednesday", "focus": "Technique", "exercises": ["Exercise 1", "Exercise 2"]}
+      ]
     }
-  </script>
+  ]
+}
+Generate 4 weeks. Only include training days (skip rest days). Adapt everything to the player's level, goal and injuries.`;
+
+  try {
+    const res = await fetch('/.netlify/functions/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: 'You are a professional padel coach. Return only valid JSON, no markdown, no explanation.' }] },
+        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      })
+    });
+
+    const data = await res.json();
+    let raw = data.candidates[0].content.parts[0].text;
+    raw = raw.replace(/```json|```/g, '').trim();
+    const plan = JSON.parse(raw);
+
+    output.textContent = 'Plan generated! Downloading PDF...';
+    output.classList.add('visible');
+
+    generatePDF(plan, level, sessions, goal, injuries);
+
+  } catch(err) {
+    output.textContent = 'Sorry, something went wrong. Please try again.';
+    output.classList.add('visible');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Generate my plan';
+}
+
+function generatePDF(plan, level, sessions, goal, injuries) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const green = [181, 242, 61];
+  const dark = [10, 13, 8];
+  const gray = [100, 120, 90];
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  let y = 0;
+
+  function newPage() {
+    doc.addPage();
+    y = 20;
+    // subtle header line
+    doc.setDrawColor(...green);
+    doc.setLineWidth(0.5);
+    doc.line(15, 15, pageW - 15, 15);
+  }
+
+  function checkY(needed) {
+    if (y + needed > pageH - 20) newPage();
+  }
+
+  // ── HEADER ──
+  doc.setFillColor(...dark);
+  doc.rect(0, 0, pageW, 40, 'F');
+  doc.setTextColor(...green);
+  doc.setFontSize(22);
+  doc.setFont('helvetica', 'bold');
+  doc.text('GEN PADEL', 15, 20);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(200, 210, 190);
+  doc.text('PERSONALISED TRAINING PLAN', 15, 30);
+  doc.setTextColor(100, 120, 90);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, pageW - 15, 30, { align: 'right' });
+
+  y = 52;
+
+  // ── PROFILE ──
+  doc.setFillColor(240, 245, 235);
+  doc.roundedRect(15, y, pageW - 30, 28, 2, 2, 'F');
+  doc.setTextColor(...dark);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  const profile = [
+    ['LEVEL', level.charAt(0).toUpperCase() + level.slice(1)],
+    ['SESSIONS/WEEK', sessions],
+    ['GOAL', goal],
+    ['LIMITATIONS', injuries]
+  ];
+  const colW = (pageW - 30) / 4;
+  profile.forEach(([label, val], i) => {
+    const x = 15 + i * colW + colW / 2;
+    doc.setTextColor(...gray);
+    doc.text(label, x, y + 9, { align: 'center' });
+    doc.setTextColor(...dark);
+    doc.setFontSize(9);
+    doc.text(val, x, y + 18, { align: 'center' });
+    doc.setFontSize(8);
+  });
+
+  y += 38;
+
+  // ── SUMMARY ──
+  doc.setTextColor(...dark);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('OVERVIEW', 15, y);
+  doc.setDrawColor(...green);
+  doc.setLineWidth(0.8);
+  doc.line(15, y + 2, 15 + doc.getTextWidth('OVERVIEW'), y + 2);
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(50, 60, 40);
+  const summaryLines = doc.splitTextToSize(plan.summary, pageW - 30);
+  doc.text(summaryLines, 15, y);
+  y += summaryLines.length * 5 + 10;
+
+  // ── TIPS ──
+  checkY(30);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...dark);
+  doc.text('KEY TIPS', 15, y);
+  doc.setDrawColor(...green);
+  doc.line(15, y + 2, 15 + doc.getTextWidth('KEY TIPS'), y + 2);
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  plan.tips.forEach(tip => {
+    checkY(8);
+    doc.setTextColor(...green);
+    doc.text('▸', 15, y);
+    doc.setTextColor(50, 60, 40);
+    const tipLines = doc.splitTextToSize(tip, pageW - 35);
+    doc.text(tipLines, 22, y);
+    y += tipLines.length * 5 + 2;
+  });
+
+  y += 8;
+
+  // ── WEEKLY PLAN ──
+  const today = new Date();
+
+  plan.weeks.forEach((week, wi) => {
+    checkY(20);
+
+    // Week header
+    doc.setFillColor(...dark);
+    doc.rect(15, y - 5, pageW - 30, 12, 'F');
+    doc.setTextColor(...green);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`WEEK ${week.week}`, 20, y + 3);
+    y += 14;
+
+    week.days.forEach(d => {
+      checkY(25);
+
+      // Calculate actual date
+      const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const targetDay = dayNames.indexOf(d.day);
+      const date = new Date(today);
+      const diff = (targetDay - today.getDay() + 7) % 7 || 7;
+      date.setDate(today.getDate() + diff + wi * 7);
+      const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+      // Day card
+      doc.setFillColor(248, 252, 244);
+      doc.roundedRect(15, y, pageW - 30, 8 + d.exercises.length * 6, 1.5, 1.5, 'F');
+      doc.setDrawColor(...green);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(15, y, pageW - 30, 8 + d.exercises.length * 6, 1.5, 1.5, 'S');
+
+      // Left accent
+      doc.setFillColor(...green);
+      doc.rect(15, y, 3, 8 + d.exercises.length * 6, 'F');
+
+      // Day name + date
+      doc.setTextColor(...dark);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(d.day.toUpperCase(), 22, y + 6);
+      doc.setTextColor(...gray);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(dateStr, 22 + doc.getTextWidth(d.day.toUpperCase() + '  '), y + 6);
+
+      // Focus badge
+      doc.setFillColor(...green);
+      doc.setTextColor(...dark);
+      doc.setFontSize(7);
+      const focusW = doc.getTextWidth(d.focus) + 6;
+      doc.roundedRect(pageW - 15 - focusW, y + 2, focusW, 6, 1, 1, 'F');
+      doc.text(d.focus, pageW - 15 - focusW / 2, y + 6.2, { align: 'center' });
+
+      // Exercises
+      d.exercises.forEach((ex, ei) => {
+        doc.setTextColor(60, 70, 50);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`• ${ex}`, 24, y + 13 + ei * 6);
+      });
+
+      y += 10 + d.exercises.length * 6 + 4;
+    });
+
+    y += 6;
+  });
+
+  // ── FOOTER ──
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(...green);
+    doc.setLineWidth(0.3);
+    doc.line(15, pageH - 12, pageW - 15, pageH - 12);
+    doc.setTextColor(...gray);
+    doc.setFontSize(7);
+    doc.text('Gen Padel Rožnov · genpadel.cz · info@genpadel.cz', 15, pageH - 6);
+    doc.text(`${i} / ${totalPages}`, pageW - 15, pageH - 6, { align: 'right' });
+  }
+
+  doc.save(`GenPadel-TrainingPlan-${new Date().toISOString().slice(0,10)}.pdf`);
+}
+</script>
 
 </body>
 </html>
