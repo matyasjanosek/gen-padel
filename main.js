@@ -126,7 +126,7 @@ window.addEventListener('scroll', () => {
   var footerTop = document.querySelector('footer').getBoundingClientRect().top;
   var arBtn = document.querySelector('.ar-wrap');
   var aiBtn = document.querySelector('.ai-btn');
-  if (footerTop < 120) {
+  if (footerTop < 280) {
     arBtn.classList.add('btn-hidden');
     aiBtn.classList.add('btn-hidden');
   } else {
