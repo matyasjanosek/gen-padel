@@ -133,6 +133,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 async function generatePlan() {
   const level = document.getElementById('level').value;
@@ -146,54 +147,33 @@ async function generatePlan() {
   btn.textContent = 'Generating...';
   output.classList.remove('visible');
 
-  const prompt = `Generate a personalised padel training plan for a ${level} player who trains ${sessions} times per week. Goal: ${goal}. Injuries/limitations: ${injuries}.
+  const prompt = `Create a 4-week padel training plan for a ${level} player, ${sessions} sessions per week, goal: ${goal}, injuries: ${injuries}.
 
-Return ONLY a JSON object in this exact format, no other text, no markdown:
-{
-  "summary": "2-3 sentence overview",
-  "tips": ["tip1", "tip2", "tip3"],
-  "weeks": [
-    {
-      "week": 1,
-      "days": [
-        {"day": "Monday", "focus": "Footwork", "exercises": ["Exercise 1 - 3x10", "Exercise 2 - 2x15"]},
-        {"day": "Wednesday", "focus": "Technique", "exercises": ["Exercise 1", "Exercise 2"]}
-      ]
-    }
-  ]
-}
-Generate 4 weeks. Only include training days. Every day object must have exactly these keys: day, focus, exercises. No extra keys.`;
+Format it clearly with:
+- A short overview paragraph
+- 3 key tips
+- Week 1, Week 2, Week 3, Week 4 sections
+- Each week has training days with day name, focus area, and 2-3 exercises
+
+Keep it concise and practical.`;
 
   try {
     const res = await fetch('/.netlify/functions/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: 'You are a professional padel coach. Return only valid JSON. No markdown, no backticks, no explanation. Only the JSON object.' }] },
+        system_instruction: { parts: [{ text: 'You are a professional padel coach. Write clear, practical training plans in plain text.' }] },
         contents: [{ role: 'user', parts: [{ text: prompt }] }]
       })
     });
 
     const data = await res.json();
-    let raw = data.candidates[0].content.parts[0].text;
-    raw = raw.replace(/```json|```/g, '').trim();
-    raw = raw.replace(/,\s*]/g, ']').replace(/,\s*}/g, '}');
-
-    let plan;
-    try {
-      plan = JSON.parse(raw);
-    } catch(e) {
-      output.textContent = raw;
-      output.classList.add('visible');
-      btn.disabled = false;
-      btn.textContent = 'Generate my plan';
-      return;
-    }
+    const text = data.candidates[0].content.parts[0].text;
 
     output.textContent = 'Plan generated! Downloading PDF...';
     output.classList.add('visible');
 
-    generatePDF(plan, level, sessions, goal, injuries);
+    generatePDF(text, level, sessions, goal, injuries);
 
   } catch(err) {
     output.textContent = 'Sorry, something went wrong. Please try again.';
@@ -204,7 +184,7 @@ Generate 4 weeks. Only include training days. Every day object must have exactly
   btn.textContent = 'Generate my plan';
 }
 
-function generatePDF(plan, level, sessions, goal, injuries) {
+function generatePDF(text, level, sessions, goal, injuries) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const green = [181, 242, 61];
@@ -214,16 +194,18 @@ function generatePDF(plan, level, sessions, goal, injuries) {
   const pageH = doc.internal.pageSize.getHeight();
   let y = 0;
 
-  function newPage() {
-    doc.addPage();
-    y = 20;
-    doc.setDrawColor(...green);
-    doc.setLineWidth(0.5);
-    doc.line(15, 15, pageW - 15, 15);
-  }
-
-  function checkY(needed) {
-    if (y + needed > pageH - 20) newPage();
+  function addFooter() {
+    const total = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= total; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(...green);
+      doc.setLineWidth(0.3);
+      doc.line(15, pageH - 12, pageW - 15, pageH - 12);
+      doc.setTextColor(...gray);
+      doc.setFontSize(7);
+      doc.text('Gen Padel Roznov · genpadel.cz · info@genpadel.cz', 15, pageH - 6);
+      doc.text(`${i} / ${total}`, pageW - 15, pageH - 6, { align: 'right' });
+    }
   }
 
   // HEADER
@@ -237,7 +219,7 @@ function generatePDF(plan, level, sessions, goal, injuries) {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(200, 210, 190);
   doc.text('PERSONALISED TRAINING PLAN', 15, 30);
-  doc.setTextColor(100, 120, 90);
+  doc.setTextColor(...gray);
   doc.text(`Generated: ${new Date().toLocaleDateString('en-GB')}`, pageW - 15, 30, { align: 'right' });
 
   y = 52;
@@ -245,10 +227,8 @@ function generatePDF(plan, level, sessions, goal, injuries) {
   // PROFILE
   doc.setFillColor(240, 245, 235);
   doc.roundedRect(15, y, pageW - 30, 28, 2, 2, 'F');
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
   const profile = [
-    ['LEVEL', level.charAt(0).toUpperCase() + level.slice(1)],
+    ['LEVEL', level],
     ['SESSIONS/WEEK', sessions],
     ['GOAL', goal],
     ['LIMITATIONS', injuries]
@@ -257,130 +237,91 @@ function generatePDF(plan, level, sessions, goal, injuries) {
   profile.forEach(([label, val], i) => {
     const x = 15 + i * colW + colW / 2;
     doc.setTextColor(...gray);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
     doc.text(label, x, y + 9, { align: 'center' });
     doc.setTextColor(...dark);
     doc.setFontSize(9);
-    doc.text(val, x, y + 18, { align: 'center' });
-    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(String(val), x, y + 18, { align: 'center' });
   });
 
   y += 38;
 
-  // SUMMARY
-  doc.setTextColor(...dark);
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('OVERVIEW', 15, y);
-  doc.setDrawColor(...green);
-  doc.setLineWidth(0.8);
-  doc.line(15, y + 2, 15 + doc.getTextWidth('OVERVIEW'), y + 2);
-  y += 8;
-  doc.setFont('helvetica', 'normal');
+  // PLAN TEXT
   doc.setFontSize(9);
-  doc.setTextColor(50, 60, 40);
-  const summaryLines = doc.splitTextToSize(plan.summary, pageW - 30);
-  doc.text(summaryLines, 15, y);
-  y += summaryLines.length * 5 + 10;
-
-  // TIPS
-  checkY(30);
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...dark);
-  doc.text('KEY TIPS', 15, y);
-  doc.setDrawColor(...green);
-  doc.line(15, y + 2, 15 + doc.getTextWidth('KEY TIPS'), y + 2);
-  y += 8;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  plan.tips.forEach(tip => {
-    checkY(8);
-    doc.setTextColor(...green);
-    doc.text('>', 15, y);
-    doc.setTextColor(50, 60, 40);
-    const tipLines = doc.splitTextToSize(tip, pageW - 35);
-    doc.text(tipLines, 22, y);
-    y += tipLines.length * 5 + 2;
-  });
+  doc.setTextColor(40, 50, 30);
 
-  y += 8;
+  const lines = text.split('\n');
+  lines.forEach(line => {
+    if (y > pageH - 20) {
+      doc.addPage();
+      y = 20;
+      doc.setDrawColor(...green);
+      doc.setLineWidth(0.5);
+      doc.line(15, 15, pageW - 15, 15);
+    }
 
-  // WEEKLY PLAN
-  const today = new Date();
-  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const trimmed = line.trim();
+    if (!trimmed) { y += 3; return; }
 
-  plan.weeks.forEach((week, wi) => {
-    checkY(20);
-
-    doc.setFillColor(...dark);
-    doc.rect(15, y - 5, pageW - 30, 12, 'F');
-    doc.setTextColor(...green);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`WEEK ${week.week}`, 20, y + 3);
-    y += 14;
-
-    week.days.forEach(d => {
-      const exercises = d.exercises || [];
-      checkY(16 + exercises.length * 6);
-
-      const targetDay = dayNames.indexOf(d.day);
-      const date = new Date(today);
-      const diff = ((targetDay - today.getDay() + 7) % 7) || 7;
-      date.setDate(today.getDate() + diff + wi * 7);
-      const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-      const cardH = 8 + exercises.length * 6;
-
-      doc.setFillColor(248, 252, 244);
-      doc.roundedRect(15, y, pageW - 30, cardH, 1.5, 1.5, 'F');
-      doc.setFillColor(...green);
-      doc.rect(15, y, 3, cardH, 'F');
-
-      doc.setTextColor(...dark);
-      doc.setFontSize(9);
+    // Week headers
+    if (trimmed.match(/^week\s*\d/i) || trimmed.match(/^##/i)) {
+      y += 4;
+      doc.setFillColor(...dark);
+      doc.rect(15, y - 5, pageW - 30, 10, 'F');
+      doc.setTextColor(...green);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.text(d.day.toUpperCase(), 22, y + 6);
-      doc.setTextColor(...gray);
-      doc.setFontSize(8);
+      doc.text(trimmed.replace(/^#+\s*/, '').toUpperCase(), 20, y + 1);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(dateStr, 22 + doc.getTextWidth(d.day.toUpperCase()) + 3, y + 6);
+      doc.setTextColor(40, 50, 30);
+      y += 10;
+      return;
+    }
 
-      const focus = d.focus || '';
-      if (focus) {
-        doc.setFillColor(...green);
-        doc.setTextColor(...dark);
-        doc.setFontSize(7);
-        const focusW = doc.getTextWidth(focus) + 6;
-        doc.roundedRect(pageW - 15 - focusW, y + 2, focusW, 6, 1, 1, 'F');
-        doc.text(focus, pageW - 15 - focusW / 2, y + 6.2, { align: 'center' });
-      }
+    // Day headers
+    if (trimmed.match(/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i) || trimmed.match(/^\*\*(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i)) {
+      y += 2;
+      doc.setFillColor(240, 248, 230);
+      doc.setDrawColor(...green);
+      doc.setLineWidth(0.3);
+      const wrapped = doc.splitTextToSize(trimmed.replace(/\*\*/g, ''), pageW - 35);
+      doc.roundedRect(15, y - 4, pageW - 30, wrapped.length * 5 + 4, 1, 1, 'FD');
+      doc.setFillColor(...green);
+      doc.rect(15, y - 4, 3, wrapped.length * 5 + 4, 'F');
+      doc.setTextColor(...dark);
+      doc.setFont('helvetica', 'bold');
+      doc.text(wrapped, 22, y + 1);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(40, 50, 30);
+      y += wrapped.length * 5 + 6;
+      return;
+    }
 
-      exercises.forEach((ex, ei) => {
-        doc.setTextColor(60, 70, 50);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`• ${ex}`, 24, y + 13 + ei * 6);
-      });
+    // Bullet points
+    if (trimmed.startsWith('-') || trimmed.startsWith('•') || trimmed.startsWith('*')) {
+      const content = trimmed.replace(/^[-•*]\s*/, '').replace(/\*\*/g, '');
+      const wrapped = doc.splitTextToSize(content, pageW - 35);
+      doc.setTextColor(...green);
+      doc.text('•', 18, y);
+      doc.setTextColor(40, 50, 30);
+      doc.text(wrapped, 24, y);
+      y += wrapped.length * 5 + 1;
+      return;
+    }
 
-      y += cardH + 4;
-    });
-
-    y += 6;
+    // Regular text
+    const clean = trimmed.replace(/\*\*/g, '');
+    const wrapped = doc.splitTextToSize(clean, pageW - 30);
+    doc.setTextColor(40, 50, 30);
+    doc.text(wrapped, 15, y);
+    y += wrapped.length * 5 + 2;
   });
 
-  // FOOTER
-  const totalPages = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
-    doc.setDrawColor(...green);
-    doc.setLineWidth(0.3);
-    doc.line(15, pageH - 12, pageW - 15, pageH - 12);
-    doc.setTextColor(...gray);
-    doc.setFontSize(7);
-    doc.text('Gen Padel Roznov · genpadel.cz · info@genpadel.cz', 15, pageH - 6);
-    doc.text(`${i} / ${totalPages}`, pageW - 15, pageH - 6, { align: 'right' });
-  }
-
+  addFooter();
   doc.save(`GenPadel-TrainingPlan-${new Date().toISOString().slice(0,10)}.pdf`);
 }
 </script>
